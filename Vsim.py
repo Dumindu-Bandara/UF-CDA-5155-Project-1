@@ -177,27 +177,35 @@ class Processor():
         self.cycle = 1
         self.PC = MEMORY_START
 
+        print(f"Initial PC: {self.PC}")
+        print(f"Initial Registers: {self.register_file}")
+        print(f"Initial Memory: {self.memory}")
+
     def process(self, riscv_text: str = None):
+
+
 
         with open(riscv_text, 'r') as file:
             instructions = file.readlines()
 
-            for instruction in instructions:
-                instruction = instruction.strip()
-                decoded_instruction = instruction_decoder(instruction, self.PC)
+            instructions = {MEMORY_START + i * 4: inst.strip() for i, inst in enumerate(instructions)}
 
-                # print(f"--------------------\nCycle:{self.cycle}\n{decoded_instruction['assembly']}\n")
+        while True:
+            instruction = instructions.get(self.PC)
+            decoded_instruction = instruction_decoder(instruction, self.PC)
+
+            # print(f"--------------------\nCycle:{self.cycle}\n{decoded_instruction['assembly']}\n")
 
 
 
-                self.execute_instruction(decoded_instruction)
+            self.execute_instruction(decoded_instruction)
 
-                self.output_state(decoded_instruction)
+            self.output_state(decoded_instruction)
 
-                if decoded_instruction["operation"] == Category4Opcode.BREAK:
-                    break
+            if decoded_instruction["operation"] == Category4Opcode.BREAK:
+                break
 
-                self.cycle += 1
+            self.cycle += 1
 
     def execute_instruction(self, decoded_instruction: dict):
         # print(decoded_instruction["category"], decoded_instruction["operation"])
@@ -291,9 +299,9 @@ class Processor():
         mem_addresses_min = mem_addresses[0]
         mem_addresses_max = mem_addresses[-1]
 
-        for i in range(mem_addresses_min, mem_addresses_max + 1, 8):
+        for i in range(mem_addresses_min, mem_addresses_max + 1, 32):
 
-            row = [self.memory.get(addr, 0) for addr in range(i, i + 8)]
+            row = [self.memory.get(addr, 0) for addr in range(i, i + 32, 4) if addr <= mem_addresses_max]
 
             memory_print += f"{i}:\t" + "\t".join([str(val) for val in row]) + "\n"
              
