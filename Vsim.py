@@ -190,22 +190,28 @@ class Processor():
 
             instructions = {MEMORY_START + i * 4: inst.strip() for i, inst in enumerate(instructions)}
 
-        while True:
-            instruction = instructions.get(self.PC)
-            decoded_instruction = instruction_decoder(instruction, self.PC)
+        with open("simulation.txt", 'w') as simfile:
+            while True:
+                instruction = instructions.get(self.PC)
+                decoded_instruction = instruction_decoder(instruction, self.PC)
 
-            # print(f"--------------------\nCycle:{self.cycle}\n{decoded_instruction['assembly']}\n")
+                # print(f"--------------------\nCycle:{self.cycle}\n{decoded_instruction['assembly']}\n")
 
 
 
-            self.execute_instruction(decoded_instruction)
+                self.execute_instruction(decoded_instruction)
 
-            self.output_state(decoded_instruction)
+                output_state = self.output_state(decoded_instruction)
 
-            if decoded_instruction["operation"] == Category4Opcode.BREAK:
-                break
+                if self.cycle !=1: 
+                    simfile.write("\n")
 
-            self.cycle += 1
+                simfile.write(output_state)
+
+                if decoded_instruction["operation"] == Category4Opcode.BREAK:
+                    break
+
+                self.cycle += 1
 
     def execute_instruction(self, decoded_instruction: dict):
         # print(decoded_instruction["category"], decoded_instruction["operation"])
@@ -290,11 +296,8 @@ class Processor():
 
     def output_state(self, decoded_instruction):
 
-        memory = self.memory
-
         memory_print = ""
-
-        mem_addresses = sorted(memory.keys())
+        mem_addresses = sorted(self.memory.keys())
 
         mem_addresses_min = mem_addresses[0]
         mem_addresses_max = mem_addresses[-1]
@@ -308,18 +311,16 @@ class Processor():
 
         output = textwrap.dedent(f"""
             {'-' * 20}
-            Cycle: {self.cycle}\t{decoded_instruction["assembly"]}
-
+            Cycle {self.cycle}:\t{decoded_instruction["assembly"].split("\t")[1]}
             Registers
             x00:\t{"\t".join(str(self.register_file[i]) for i in range(0, 8))}
             x08:\t{"\t".join(str(self.register_file[i]) for i in range(8, 16))}
             x16:\t{"\t".join(str(self.register_file[i]) for i in range(16, 24))}
             x24:\t{"\t".join(str(self.register_file[i]) for i in range(24, 32))}
-
             Data
         """) + memory_print
 
-        print(output)
+        return output[1:-1]
 
 
         
