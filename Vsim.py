@@ -11,6 +11,7 @@ On my honor, I have neither given nor received any unauthorized aid on this assi
 
 import argparse
 from enum import Enum
+import textwrap
 
 MEMORY_START = 256
 
@@ -53,12 +54,86 @@ def twos_complement(bin_str: str) -> int:
     value = - int(bin_str[0]) * 2**(len(bin_str) - 1) + int(bin_str[1:], 2)
     return value
     
+def instruction_decoder(instruction: str, address: int):
 
+    output_dict = {}
+
+    if instruction[30:32] == InstructionCategory.CATEGORY_1.value:
+        opcode = instruction[25:30]
+        immediate = instruction[0:7] + instruction[20:25]
+
+        output_dict["immediate"] = twos_complement(immediate)
+        output_dict["rs1"] = int(instruction[12:17], 2)
+        output_dict["rs2"] = int(instruction[7:12], 2)
+        output_dict["func3"] = "000"
+        
+
+        output_dict["category"] = InstructionCategory.CATEGORY_1
+        operation = Category1Opcode(opcode)
+        output_dict["operation"] = operation
+
+        if operation == Category1Opcode.SW:
+            output_dict["assembly"] = f"{instruction}\t{address} {operation.name.lower()} x{output_dict['rs1']}, {output_dict['immediate']}(x{output_dict['rs2']})"
+        else:
+            output_dict["assembly"] = f"{instruction}\t{address} {operation.name.lower()} x{output_dict["rs1"]}, x{output_dict["rs2"]}, #{output_dict["immediate"]}"
+
+        
+
+    elif instruction[30:32] == InstructionCategory.CATEGORY_2.value:
+        opcode = instruction[25:30]
+        output_dict["rd"] = int(instruction[20:25], 2)
+        output_dict["rs1"] = int(instruction[12:17], 2)
+        output_dict["rs2"] = int(instruction[7:12], 2)
+        output_dict["func3"] = "000"
+        output_dict["func7"] = "0000000"
+
+        output_dict["category"] = InstructionCategory.CATEGORY_2
+        operation = Category2Opcode(opcode)
+        output_dict["operation"] = operation
+
+        output_dict["assembly"] = (f"{instruction}\t{address} {operation.name.lower()} x{output_dict["rd"]}, x{output_dict["rs1"]}, x{output_dict["rs2"]}")
+
+
+    elif instruction[30:32] == InstructionCategory.CATEGORY_3.value:
+        opcode = instruction[25:30]
+        output_dict["rd"] = int(instruction[20:25], 2)
+        output_dict["rs1"] = int(instruction[12:17], 2)
+        immediate = instruction[0:12]
+        output_dict["immediate"] = twos_complement(immediate)
+        output_dict["func3"] = "000"
+
+        output_dict["category"] = InstructionCategory.CATEGORY_3
+        operation = Category3Opcode(opcode)
+        output_dict["operation"] = operation
+
+
+        if operation == Category3Opcode.LW:
+            output_dict["assembly"] = (f"{instruction}\t{address} {operation.name.lower()} x{output_dict["rd"]}, {output_dict["immediate"]}(x{output_dict["rs1"]})")
+        else:
+            output_dict["assembly"] = (f"{instruction}\t{address} {operation.name.lower()} x{output_dict["rd"]}, x{output_dict["rs1"]}, #{output_dict["immediate"]}")
+
+    elif instruction[30:32] == InstructionCategory.CATEGORY_4.value:
+        opcode = instruction[25:30]
+
+        output_dict["category"] = InstructionCategory.CATEGORY_4
+        operation = Category4Opcode(opcode)
+        output_dict["operation"] = operation
+
+        if opcode == Category4Opcode.BREAK.value:
+            output_dict["assembly"] = (f"{instruction}\t{address} break")
+        elif opcode == Category4Opcode.JAL.value:
+            rd = int(instruction[20:25], 2)
+            output_dict["rd"] = rd
+
+            immediate = instruction[0:20]
+            output_dict["immediate"] = twos_complement(immediate)
+            output_dict["assembly"] = (f"{instruction}\t{address} jal x{output_dict['rd']}, #{output_dict['immediate']}")
+
+    return output_dict
 
 class Disassembler():
 
-    def __init__(self, riscv_text: str):
-        self.riscv_text = riscv_text
+    def __init__(self):
         self.memory = {}
         self.state = DissasemblyState.INSTRUCTION
         
@@ -75,56 +150,12 @@ class Disassembler():
                 instruction = instruction.strip()
 
                 if self.state == DissasemblyState.INSTRUCTION:
-                    if instruction[30:32] == InstructionCategory.CATEGORY_1.value:
-                        opcode = instruction[25:30]
-                        immediate = instruction[0:7] + instruction[20:25]
-                        immediate = twos_complement(immediate)
-                        rs1 = int(instruction[12:17], 2)
-                        rs2 = int(instruction[7:12], 2)
-                        func3 = "000"
+                    decoded_instruction = instruction_decoder(instruction, address)
+                    disassebly_output.append(decoded_instruction["assembly"])
 
-                        operation = Category1Opcode(opcode)
-
-                        if operation == Category1Opcode.SW:
-                            disassebly_output.append(f"{instruction}\t{address} {operation.name.lower()} x{rs1}, {immediate}(x{rs2})")
-                        else:
-                            disassebly_output.append(f"{instruction}\t{address} {operation.name.lower()} x{rs1}, x{rs2}, #{immediate}")
-
-                    elif instruction[30:32] == InstructionCategory.CATEGORY_2.value:
-                        opcode = instruction[25:30]
-                        rd = int(instruction[20:25], 2)
-                        rs1 = int(instruction[12:17], 2)
-                        rs2 = int(instruction[7:12], 2)
-                        func3 = "000"
-                        func7 = "0000000"
-
-                        operation = Category2Opcode(opcode)
-                        disassebly_output.append(f"{instruction}\t{address} {operation.name.lower()} x{rd}, x{rs1}, x{rs2}")
-
-                    elif instruction[30:32] == InstructionCategory.CATEGORY_3.value:
-                        opcode = instruction[25:30]
-                        rd = int(instruction[20:25], 2)
-                        rs1 = int(instruction[12:17], 2)
-                        immediate = instruction[0:12]
-                        immediate = twos_complement(immediate)
-                        func3 = "000"
-
-                        operation = Category3Opcode(opcode)
-                        if operation == Category3Opcode.LW:
-                            disassebly_output.append(f"{instruction}\t{address} {operation.name.lower()} x{rd}, {immediate}(x{rs1})")
-                        else:
-                            disassebly_output.append(f"{instruction}\t{address} {operation.name.lower()} x{rd}, x{rs1}, #{immediate}")
-
-                    elif instruction[30:32] == InstructionCategory.CATEGORY_4.value:
-                        opcode = instruction[25:30]
-                        if opcode == Category4Opcode.BREAK.value:
-                            disassebly_output.append(f"{instruction}\t{address} break")
-                            self.state = DissasemblyState.DATA
-                        elif opcode == Category4Opcode.JAL.value:
-                            rd = int(instruction[20:25], 2)
-                            immediate = instruction[0:20]
-                            immediate = twos_complement(immediate)
-                            disassebly_output.append(f"{instruction}\t{address} jal x{rd}, #{immediate}")
+                    if decoded_instruction["operation"] == Category4Opcode.BREAK:
+                        self.state = DissasemblyState.DATA
+                   
 
                 elif self.state == DissasemblyState.DATA:
                     data_value = twos_complement(instruction)
@@ -140,13 +171,151 @@ class Disassembler():
 
 class Processor():
 
-    def __init__(self):
-        pass
+    def __init__(self, memory = None):
+        self.memory = memory if memory is not None else {}
+        self.register_file = [0] * 32
+        self.cycle = 1
+        self.PC = MEMORY_START
 
-    def process(self):
-        pass
+    def process(self, riscv_text: str = None):
+
+        with open(riscv_text, 'r') as file:
+            instructions = file.readlines()
+
+            for instruction in instructions:
+                instruction = instruction.strip()
+                decoded_instruction = instruction_decoder(instruction, self.PC)
+
+                # print(f"--------------------\nCycle:{self.cycle}\n{decoded_instruction['assembly']}\n")
 
 
+
+                self.execute_instruction(decoded_instruction)
+
+                self.output_state(decoded_instruction)
+
+                if decoded_instruction["operation"] == Category4Opcode.BREAK:
+                    break
+
+                self.cycle += 1
+
+    def execute_instruction(self, decoded_instruction: dict):
+        # print(decoded_instruction["category"], decoded_instruction["operation"])
+
+        # NOTE: Check data ranges of output and immediates. 
+
+        if decoded_instruction["category"] == InstructionCategory.CATEGORY_1:
+            if decoded_instruction["operation"] == Category1Opcode.BEQ:
+                if self.register_file[decoded_instruction["rs1"]] == self.register_file[decoded_instruction["rs2"]]:
+                    self.PC += decoded_instruction["immediate"] << 1
+                else:
+                    self.PC += 4
+
+            elif decoded_instruction["operation"] == Category1Opcode.BNE:
+                if self.register_file[decoded_instruction["rs1"]] != self.register_file[decoded_instruction["rs2"]]:
+                    self.PC += decoded_instruction["immediate"] << 1
+                else:
+                    self.PC += 4
+
+            elif decoded_instruction["operation"] == Category1Opcode.BLT:
+                if self.register_file[decoded_instruction["rs1"]] < self.register_file[decoded_instruction["rs2"]]:
+                    self.PC += decoded_instruction["immediate"] << 1
+                else:
+                    self.PC += 4
+
+            elif decoded_instruction["operation"] == Category1Opcode.SW:
+                address = self.register_file[decoded_instruction["rs2"]] + decoded_instruction["immediate"]
+                self.memory[address] = self.register_file[decoded_instruction["rs1"]]
+                self.PC += 4
+
+        elif decoded_instruction["category"] == InstructionCategory.CATEGORY_2:
+            if decoded_instruction["operation"] == Category2Opcode.ADD:
+                self.register_file[decoded_instruction["rd"]] = self.register_file[decoded_instruction["rs1"]] + self.register_file[decoded_instruction["rs2"]]
+                self.PC += 4
+
+            elif decoded_instruction["operation"] == Category2Opcode.SUB:
+                self.register_file[decoded_instruction["rd"]] = self.register_file[decoded_instruction["rs1"]] - self.register_file[decoded_instruction["rs2"]]
+                self.PC += 4
+
+            elif decoded_instruction["operation"] == Category2Opcode.AND:
+                self.register_file[decoded_instruction["rd"]] = self.register_file[decoded_instruction["rs1"]] & self.register_file[decoded_instruction["rs2"]]
+                self.PC += 4
+
+            elif decoded_instruction["operation"] == Category2Opcode.OR:
+                self.register_file[decoded_instruction["rd"]] = self.register_file[decoded_instruction["rs1"]] | self.register_file[decoded_instruction["rs2"]]
+                self.PC += 4
+
+        elif decoded_instruction["category"] == InstructionCategory.CATEGORY_3:
+            if decoded_instruction["operation"] == Category3Opcode.ADDI:
+                self.register_file[decoded_instruction["rd"]] = self.register_file[decoded_instruction["rs1"]] + decoded_instruction["immediate"]
+                self.PC += 4
+
+            elif decoded_instruction["operation"] == Category3Opcode.ANDI:
+                self.register_file[decoded_instruction["rd"]] = self.register_file[decoded_instruction["rs1"]] & decoded_instruction["immediate"]
+                self.PC += 4
+
+            elif decoded_instruction["operation"] == Category3Opcode.ORI:
+                self.register_file[decoded_instruction["rd"]] = self.register_file[decoded_instruction["rs1"]] | decoded_instruction["immediate"]
+                self.PC += 4
+
+            elif decoded_instruction["operation"] == Category3Opcode.SLLI:
+                self.register_file[decoded_instruction["rd"]] = self.register_file[decoded_instruction["rs1"]] << decoded_instruction["immediate"]
+                self.PC += 4
+
+            elif decoded_instruction["operation"] == Category3Opcode.SRAI:
+                self.register_file[decoded_instruction["rd"]] = self.register_file[decoded_instruction["rs1"]] >> decoded_instruction["immediate"]
+                self.PC += 4
+
+            elif decoded_instruction["operation"] == Category3Opcode.LW:
+                address = self.register_file[decoded_instruction["rs1"]] + decoded_instruction["immediate"]
+                self.register_file[decoded_instruction["rd"]] = self.memory.get(address, 0)
+                self.PC += 4
+
+        elif decoded_instruction["category"] == InstructionCategory.CATEGORY_4:
+            if decoded_instruction["operation"] == Category4Opcode.JAL:
+                self.register_file[decoded_instruction["rd"]] = self.PC + 4
+                self.PC += decoded_instruction["immediate"] << 1
+
+
+            elif decoded_instruction["operation"] == Category4Opcode.BREAK:
+                self.PC += 4
+
+    def output_state(self, decoded_instruction):
+
+        memory = self.memory
+
+        memory_print = ""
+
+        mem_addresses = sorted(memory.keys())
+
+        mem_addresses_min = mem_addresses[0]
+        mem_addresses_max = mem_addresses[-1]
+
+        for i in range(mem_addresses_min, mem_addresses_max + 1, 8):
+
+            row = [self.memory.get(addr, 0) for addr in range(i, i + 8)]
+
+            memory_print += f"{i}:\t" + "\t".join([str(val) for val in row]) + "\n"
+             
+
+        output = textwrap.dedent(f"""
+            {'-' * 20}
+            Cycle: {self.cycle}\t{decoded_instruction["assembly"]}
+
+            Registers
+            x00:\t{"\t".join(str(self.register_file[i]) for i in range(0, 8))}
+            x08:\t{"\t".join(str(self.register_file[i]) for i in range(8, 16))}
+            x16:\t{"\t".join(str(self.register_file[i]) for i in range(16, 24))}
+            x24:\t{"\t".join(str(self.register_file[i]) for i in range(24, 32))}
+
+            Data
+        """) + memory_print
+
+        print(output)
+
+
+        
+        
 
 def main():
     parser = argparse.ArgumentParser(description="RISC-V Simulator")
@@ -155,11 +324,11 @@ def main():
     args = parser.parse_args()
     riscv_text = args.riscv_text
 
-    disassembler = Disassembler(riscv_text=riscv_text)
+    disassembler = Disassembler()
     disassembler.disassemble(riscv_text=riscv_text)
 
-    processor = Processor()
-    processor.process()
+    processor = Processor(memory=disassembler.memory)
+    processor.process(riscv_text=riscv_text)
 
 
 
