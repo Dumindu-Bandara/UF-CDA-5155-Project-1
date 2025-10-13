@@ -177,10 +177,6 @@ class Processor():
         self.cycle = 1
         self.PC = MEMORY_START
 
-        print(f"Initial PC: {self.PC}")
-        print(f"Initial Registers: {self.register_file}")
-        print(f"Initial Memory: {self.memory}")
-
     def process(self, riscv_text: str = None):
 
 
