@@ -73,11 +73,9 @@ def instruction_decoder(instruction: str, address: int):
         output_dict["operation"] = operation
 
         if operation == Category1Opcode.SW:
-            output_dict["assembly"] = f"{instruction}\t{address} {operation.name.lower()} x{output_dict['rs1']}, {output_dict['immediate']}(x{output_dict['rs2']})"
+            output_dict["assembly"] = f"{instruction}\t{address}\t{operation.name.lower()} x{output_dict['rs1']}, {output_dict['immediate']}(x{output_dict['rs2']})"
         else:
-            output_dict["assembly"] = f"{instruction}\t{address} {operation.name.lower()} x{output_dict["rs1"]}, x{output_dict["rs2"]}, #{output_dict["immediate"]}"
-
-        
+            output_dict["assembly"] = f"{instruction}\t{address}\t{operation.name.lower()} x{output_dict['rs1']}, x{output_dict['rs2']}, #{output_dict['immediate']}"
 
     elif instruction[30:32] == InstructionCategory.CATEGORY_2.value:
         opcode = instruction[25:30]
@@ -91,15 +89,21 @@ def instruction_decoder(instruction: str, address: int):
         operation = Category2Opcode(opcode)
         output_dict["operation"] = operation
 
-        output_dict["assembly"] = (f"{instruction}\t{address} {operation.name.lower()} x{output_dict["rd"]}, x{output_dict["rs1"]}, x{output_dict["rs2"]}")
+        output_dict["assembly"] = (f"{instruction}\t{address}\t{operation.name.lower()} x{output_dict['rd']}, x{output_dict['rs1']}, x{output_dict['rs2']}")
 
 
     elif instruction[30:32] == InstructionCategory.CATEGORY_3.value:
         opcode = instruction[25:30]
         output_dict["rd"] = int(instruction[20:25], 2)
         output_dict["rs1"] = int(instruction[12:17], 2)
-        immediate = instruction[0:12]
-        output_dict["immediate"] = twos_complement(immediate)
+
+        if opcode in [Category3Opcode.SLLI.value, Category3Opcode.SRAI.value]:
+            immediate = instruction[7:12]
+            output_dict["immediate"] = int(immediate, 2)
+        else:
+            immediate = instruction[0:12]
+            output_dict["immediate"] = twos_complement(immediate)
+
         output_dict["func3"] = "000"
 
         output_dict["category"] = InstructionCategory.CATEGORY_3
@@ -108,9 +112,9 @@ def instruction_decoder(instruction: str, address: int):
 
 
         if operation == Category3Opcode.LW:
-            output_dict["assembly"] = (f"{instruction}\t{address} {operation.name.lower()} x{output_dict["rd"]}, {output_dict["immediate"]}(x{output_dict["rs1"]})")
+            output_dict["assembly"] = (f"{instruction}\t{address}\t{operation.name.lower()} x{output_dict['rd']}, {output_dict['immediate']}(x{output_dict['rs1']})")
         else:
-            output_dict["assembly"] = (f"{instruction}\t{address} {operation.name.lower()} x{output_dict["rd"]}, x{output_dict["rs1"]}, #{output_dict["immediate"]}")
+            output_dict["assembly"] = (f"{instruction}\t{address}\t{operation.name.lower()} x{output_dict['rd']}, x{output_dict['rs1']}, #{output_dict['immediate']}")
 
     elif instruction[30:32] == InstructionCategory.CATEGORY_4.value:
         opcode = instruction[25:30]
@@ -120,14 +124,14 @@ def instruction_decoder(instruction: str, address: int):
         output_dict["operation"] = operation
 
         if opcode == Category4Opcode.BREAK.value:
-            output_dict["assembly"] = (f"{instruction}\t{address} break")
+            output_dict["assembly"] = (f"{instruction}\t{address}\tbreak")
         elif opcode == Category4Opcode.JAL.value:
             rd = int(instruction[20:25], 2)
             output_dict["rd"] = rd
 
             immediate = instruction[0:20]
             output_dict["immediate"] = twos_complement(immediate)
-            output_dict["assembly"] = (f"{instruction}\t{address} jal x{output_dict['rd']}, #{output_dict['immediate']}")
+            output_dict["assembly"] = (f"{instruction}\t{address}\tjal x{output_dict['rd']}, #{output_dict['immediate']}")
 
     return output_dict
 
@@ -190,10 +194,6 @@ class Processor():
             while True:
                 instruction = instructions.get(self.PC)
                 decoded_instruction = instruction_decoder(instruction, self.PC)
-
-                # print(f"--------------------\nCycle:{self.cycle}\n{decoded_instruction['assembly']}\n")
-
-
 
                 self.execute_instruction(decoded_instruction)
 
@@ -290,6 +290,9 @@ class Processor():
             elif decoded_instruction["operation"] == Category4Opcode.BREAK:
                 self.PC += 4
 
+        # NOTE: x0 is always 0
+        self.register_file[0] = 0  # x0 is always 0
+
     def output_state(self, decoded_instruction):
 
         memory_print = ""
@@ -303,18 +306,27 @@ class Processor():
             row = [self.memory.get(addr, 0) for addr in range(i, i + 32, 4) if addr <= mem_addresses_max]
 
             memory_print += f"{i}:\t" + "\t".join([str(val) for val in row]) + "\n"
-             
 
-        output = textwrap.dedent(f"""
-            {'-' * 20}
-            Cycle {self.cycle}:\t{decoded_instruction["assembly"].split("\t")[1]}
+        assembly_line = "\t".join(decoded_instruction["assembly"].split('\t')[1:])
+
+        output = textwrap.dedent("""
+            {}
+            Cycle {}:\t{}
             Registers
-            x00:\t{"\t".join(str(self.register_file[i]) for i in range(0, 8))}
-            x08:\t{"\t".join(str(self.register_file[i]) for i in range(8, 16))}
-            x16:\t{"\t".join(str(self.register_file[i]) for i in range(16, 24))}
-            x24:\t{"\t".join(str(self.register_file[i]) for i in range(24, 32))}
+            x00:\t{}
+            x08:\t{}
+            x16:\t{}
+            x24:\t{}
             Data
-        """) + memory_print
+        """).format(
+            '-' * 20,
+            self.cycle,
+            assembly_line,
+            '\t'.join(str(self.register_file[i]) for i in range(0, 8)),
+            '\t'.join(str(self.register_file[i]) for i in range(8, 16)),
+            '\t'.join(str(self.register_file[i]) for i in range(16, 24)),
+            '\t'.join(str(self.register_file[i]) for i in range(24, 32))
+        ) + memory_print
 
         return output[1:-1]
 
