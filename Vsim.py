@@ -365,17 +365,20 @@ class Processor:
         memory_print = ""
         mem_addresses = sorted(self.memory.keys())
 
-        mem_addresses_min = mem_addresses[0]
-        mem_addresses_max = mem_addresses[-1]
+        if len(mem_addresses) > 0:
+            mem_addresses_min = mem_addresses[0]
+            mem_addresses_max = mem_addresses[-1]
 
-        for i in range(mem_addresses_min, mem_addresses_max + 1, 32):
-            row = [
-                self.memory.get(addr, 0)
-                for addr in range(i, i + 32, 4)
-                if addr <= mem_addresses_max
-            ]
+            for i in range(mem_addresses_min, mem_addresses_max + 1, 32):
+                row = [
+                    self.memory.get(addr, 0)
+                    for addr in range(i, i + 32, 4)
+                    if addr <= mem_addresses_max
+                ]
 
-            memory_print += f"{i}:\t" + "\t".join([str(val) for val in row]) + "\n"
+                memory_print += f"{i}:\t" + "\t".join([str(val) for val in row]) + "\n"
+        else:
+            memory_print = ""
 
         assembly_line = "\t".join(decoded_instruction["assembly"].split("\t")[1:])
 
