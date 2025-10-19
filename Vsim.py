@@ -209,6 +209,15 @@ class Processor():
 
                 self.cycle += 1
 
+    def handle_overflow(self) -> None:
+
+        for i in range(len(self.register_file)):
+            if self.register_file[i] < -2**31:
+                self.register_file[i] = ((self.register_file[i] + 2**31) % 2**32) - 2**31
+            elif self.register_file[i] > 2**31 - 1:
+                self.register_file[i] = ((self.register_file[i] - 2**31) % 2**32) - 2**31
+        return self.register_file
+
     def execute_instruction(self, decoded_instruction: dict):
         # print(decoded_instruction["category"], decoded_instruction["operation"])
 
@@ -290,8 +299,13 @@ class Processor():
             elif decoded_instruction["operation"] == Category4Opcode.BREAK:
                 self.PC += 4
 
+
+        self.handle_overflow()
+
         # NOTE: x0 is always 0
         self.register_file[0] = 0  # x0 is always 0
+
+
 
     def output_state(self, decoded_instruction):
 
