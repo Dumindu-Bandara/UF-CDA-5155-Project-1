@@ -92,10 +92,6 @@ def instruction_decoder(instruction: str, address: int) -> dict[str, int | str |
 
     output_dict = {}
 
-    print(address)
-
-    print(instruction)
-
     if instruction[30:32] == InstructionCategory.CATEGORY_1.value:
         opcode = instruction[25:30]
         immediate = instruction[0:7] + instruction[20:25]
