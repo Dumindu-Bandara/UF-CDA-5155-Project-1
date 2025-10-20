@@ -3,7 +3,7 @@ UFID: 61994080
 Name: Dumindu Ashen Bandara Elamure Mudiyanselage
 Course: CDA 5155 - Computer Architecture
 Project 1 - RISC-V Simulator
-Date: 2024-10-11
+Date: 2024-10-19
 
 Academic Honesty Statement:
 On my honor, I have neither given nor received any unauthorized aid on this assignment.
@@ -17,11 +17,15 @@ MEMORY_START = 256
 
 
 class DissasemblyState(Enum):
+    """State variable which denotes whether the disassembly is in instruction or data mode."""
+
     INSTRUCTION = 1
     DATA = 2
 
 
 class InstructionCategory(Enum):
+    """Enumeration for instruction categories."""
+
     CATEGORY_1 = "00"
     CATEGORY_2 = "01"
     CATEGORY_3 = "10"
@@ -29,6 +33,8 @@ class InstructionCategory(Enum):
 
 
 class Category1Opcode(Enum):
+    """Enumeration for Category 1 opcodes."""
+
     BEQ = "00000"
     BNE = "00001"
     BLT = "00010"
@@ -36,6 +42,8 @@ class Category1Opcode(Enum):
 
 
 class Category2Opcode(Enum):
+    """Enumeration for Category 2 opcodes."""
+
     ADD = "00000"
     SUB = "00001"
     AND = "00010"
@@ -43,6 +51,8 @@ class Category2Opcode(Enum):
 
 
 class Category3Opcode(Enum):
+    """Enumeration for Category 3 opcodes."""
+
     ADDI = "00000"
     ANDI = "00001"
     ORI = "00010"
@@ -52,17 +62,39 @@ class Category3Opcode(Enum):
 
 
 class Category4Opcode(Enum):
+    """Enumeration for Category 4 opcodes."""
+
     JAL = "00000"
     BREAK = "11111"
 
 
 def twos_complement(bin_str: str) -> int:
+    """Convert a binary string in two's complement format to its integer value.
+
+    Args:
+        bin_str (str): The binary string to convert.
+    Returns:
+        int: The integer value of the binary string.
+    """
+
     value = -int(bin_str[0]) * 2 ** (len(bin_str) - 1) + int(bin_str[1:], 2)
     return value
 
 
-def instruction_decoder(instruction: str, address: int):
+def instruction_decoder(instruction: str, address: int) -> dict[str, int | str | Enum]:
+    """Decode a RISC-V instruction into its components.
+    Args:
+        instruction (str): The binary string representation of the instruction.
+        address (int): The memory address of the instruction.
+    Returns:
+        dict: A dictionary containing the decoded instruction components.
+    """
+
     output_dict = {}
+
+    print(address)
+
+    print(instruction)
 
     if instruction[30:32] == InstructionCategory.CATEGORY_1.value:
         opcode = instruction[25:30]
@@ -152,11 +184,19 @@ def instruction_decoder(instruction: str, address: int):
 
 
 class Disassembler:
+    """Class to handle disassembly of RISC-V instructions and data."""
+
     def __init__(self):
         self.memory = {}
         self.state = DissasemblyState.INSTRUCTION
 
     def disassemble(self, riscv_text: str):
+        """Disassemble the RISC-V instructions and data from the input file.
+
+        Args:
+            riscv_text (str): Path to the input file containing RISC-V instructions.
+        """
+
         disassebly_output = []
 
         with open(riscv_text, "r") as file:
@@ -186,13 +226,25 @@ class Disassembler:
 
 
 class Processor:
+    """Class to simulate the execution of RISC-V instructions."""
+
     def __init__(self, memory=None):
+        """Initialize the processor with memory and registers.
+        Args:
+            memory (dict): Initial memory state.
+        """
+
         self.memory = memory if memory is not None else {}
         self.register_file = [0] * 32
         self.cycle = 1
         self.PC = MEMORY_START
 
     def process(self, riscv_text: str = None):
+        """Process the RISC-V instructions from the input file.
+        Args:
+            riscv_text (str): Path to the input file containing RISC-V instructions.
+        """
+
         with open(riscv_text, "r") as file:
             instructions = file.readlines()
 
@@ -221,6 +273,8 @@ class Processor:
                 self.cycle += 1
 
     def handle_overflow(self) -> None:
+        """Handle overflow for register values to ensure they stay within 32-bit signed integer range."""
+
         for i in range(len(self.register_file)):
             if self.register_file[i] < -(2**31):
                 self.register_file[i] = (
@@ -233,9 +287,10 @@ class Processor:
         return self.register_file
 
     def execute_instruction(self, decoded_instruction: dict):
-        # print(decoded_instruction["category"], decoded_instruction["operation"])
-
-        # NOTE: Check data ranges of output and immediates.
+        """Execute a decoded RISC-V instruction.
+        Args:
+            decoded_instruction (dict): The decoded instruction components.
+        """
 
         if decoded_instruction["category"] == InstructionCategory.CATEGORY_1:
             if decoded_instruction["operation"] == Category1Opcode.BEQ:
@@ -359,9 +414,16 @@ class Processor:
         self.handle_overflow()
 
         # NOTE: x0 is always 0
-        self.register_file[0] = 0  # x0 is always 0
+        self.register_file[0] = 0
 
-    def output_state(self, decoded_instruction):
+    def output_state(self, decoded_instruction: dict) -> str:
+        """Generate the output state of the processor after executing an instruction.
+        Args:
+            decoded_instruction (dict): The decoded instruction components.
+        Returns:
+            str: The formatted output state of the processor.
+        """
+
         memory_print = ""
         mem_addresses = sorted(self.memory.keys())
 
